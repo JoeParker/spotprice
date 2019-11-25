@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+	<!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
+	<script src="plotly-latest.min.js"></script>
+	<title>Spot Price Visualisation</title>
+</head>
+
+<body>
+
+<div id="dataoptions" style="
+	max-width: 1280px;
+	margin: auto;
+	margin-top: 30px;
+	">
+Compare instances:
+
+<select id = "osselect">
+ 	<option value="unx">Linux/UNIX</option>
+	<option value="sus">SUSE Linux</option>
+	<option value="win">Windows</option>
+</select>
+
+<select id = "typeselect">
+ 	<option value="t1m4m3m1">General Purpose (T1, M4, M3, M1)</option>
+	<option value="c4c3c1cc2">Compute Optimised (C4, C3, C1, CC2)</option>
+	<option value="x1r4r3m2cr1">Memory Optimised (X1, R4, R3, M2, CR1)</option>
+	<option value="i3i2d2hi1">Storage Optimised (I3, I2, D2, HI1)</option>
+	<option value="g3g2p2cg1f1">GPU-Accelerated Computing (G3, G2, P2, CG1, F1)</option>
+</select>
+
+<select id = "zoneselect" onchange = 'allCaution()'>
+ 	<option value="a">Availablility Zone 1a</option>
+	<option value="b">Availablility Zone 1b</option>
+	<option value="c">Availablility Zone 1c</option>
+	<option value="d">Availablility Zone 1d</option>
+	<option value="e">Availablility Zone 1e</option>
+	<option value="all">All</option>
+</select>
+
+<input type="file" onchange='readText(this)' />
+</div>
+
+<div id="datapreview" style="
+	padding: 5px;
+	max-height: 200px; 
+	max-width: 1270px; 
+	overflow: auto; 
+	margin: auto; 
+	margin-top: 30px;
+	border: 1px solid gray;
+	">
+	Select a data file to load.
+</div>
+
+<div id="resetbutton" style="
+		margin: 10px;
+		text-align: center;
+	">
+	<form onchange='window.location.reload()'>
+    	<input type="submit" value="Reset" />
+	</form> 
+</div>
+
+<div id="graphdiv" style="
+	width: 1280px;
+	height: 720px;
+	margin: auto;
+	">
+</div>
+
+<div id ="sidebysidegraphs" style="
+	width: 1280px;
+	margin: auto;
+">
+<div id="histogramdiv" style="
+	width: 640px;
+	height: 640px;
+	float: left;
+	">
+</div>
+
+<div id="timelagdiv" style="
+	width: 640px;
+	height: 640px;
+	float: right;
+	">
+</div>
+</div>
+
+<script type="text/javascript">
+
+function allCaution() {
+    if(document.getElementById("zoneselect").value=="all") {
+         alert("Warning: Selecting all Availability Zones may result in very slow load times.");
+    }
+}
+
+var reader = new FileReader();
+
+var entries = []; //array for data entry objects
+var typenames = []; //array of instances to visualise will be set to one of the following by user
+
+//list of available spot instance types (including previous gen) categorised:
+//general purpose
+var type1 = ["t1.micro", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "m4.16xlarge", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "m1.small", "m1.medium", "m1.large", "m1.xlarge"];
+//compute optimised
+var type2 = ["c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge", "c1.medium", "c1.xlarge", "cc2.8xlarge"];
+//memory optimised
+var type3 = ["x1.16xlarge", "x1.32xlarge", "r4.large", "r4.xlarge", "r4.2xlarge", "r4.4xlarge", "r4.8xlarge", "r4.16xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "cr1.8xlarge"];
+//storage (I/O) optimised
+var type4 = ["i3.large", "i3.xlarge", "i3.2xlarge", "i3.4xlarge", "i3.8xlarge", "i3.16xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "hi1.4xlarge"];
+//GPU optimised
+var type5 = ["g3.4xlarge", "g3.8xlarge", "g3.16xlarge", "g2.2xlarge", "g2.8xlarge", "p2.xlarge", "p2.8xlarge", "p2.16xlarge", "cg1.4xlarge", "f1.2xlarge", "f1.16xlarge"];
+
+function readText(that){
+	if(that.files && that.files[0]){
+		document.getElementById('datapreview').innerHTML = "Loading data...this may take a while.";
+
+		var reader = new FileReader();
+		reader.onload = function (e) {  
+			var output = e.target.result;
+			
+			//filter OS	
+			var os = document.getElementById("osselect").options[osselect.selectedIndex].value;
+			if (os == "unx") {
+				output = output.split("\n").filter(/./.test, /Linux\/UNIX/).join("\n");
+			}
+			else if (os == "sus") {
+				output = output.split("\n").filter(/./.test, /SUSE Linux/).join("\n");
+			}
+			else if (os == "win") {
+				output = output.split("\n").filter(/./.test, /Windows/).join("\n");
+			}
+			//filter availibility zone
+		 	var zone = document.getElementById("zoneselect").options[zoneselect.selectedIndex].value;
+			if (zone == "a") {
+				output = output.split("\n").filter(/./.test, /-1a/).join("\n");
+			}
+			else if (zone == "b") {
+				output = output.split("\n").filter(/./.test, /-1b/).join("\n");
+			}
+			else if (zone == "c") {
+				output = output.split("\n").filter(/./.test, /-1c/).join("\n");
+			}
+			else if (zone == "d") {
+				output = output.split("\n").filter(/./.test, /-1d/).join("\n");
+			}
+			else if (zone == "e") {
+				output = output.split("\n").filter(/./.test, /-1e/).join("\n");
+			}
+			//filter instance type
+			var zone = document.getElementById("typeselect").options[typeselect.selectedIndex].value;
+			if (zone == "t1m4m3m1") {
+				typenames = type1;
+				var outputarray = output.split("\n");
+				var filtered = []; //use manual filter to preserve timestamp ordering
+				for (i = 0; i < outputarray.length; i++) {
+					if (
+						outputarray[i].includes("t1.") ||
+						outputarray[i].includes("m4.") ||
+						outputarray[i].includes("m3.") ||
+						outputarray[i].includes("m1.")
+						) {
+						filtered.push(outputarray[i]);
+					}
+				}
+				output = filtered.join("\n");
+				//parse entry data into objects
+				for (i = 0; i < filtered.length; i++) {
+					var currentline = filtered[i].split("\t");
+					var entry = {
+						price:currentline[1],
+						time:currentline[2].substring(0, 19).replace("T", " "), //reformat timestamp
+						name:currentline[3]
+					};
+					entries.push(entry);
+				}
+			}
+			else if (zone == "c4c3c1cc2") {
+				typenames = type2;
+				var outputarray = output.split("\n");
+				var filtered = []; //use manual filter to preserve timestamp ordering
+				for (i = 0; i < outputarray.length; i++) {
+					if (
+						outputarray[i].includes("c4.") ||
+						outputarray[i].includes("c3.") ||
+						outputarray[i].includes("c1.") ||
+						outputarray[i].includes("cc2.")
+						) {
+						filtered.push(outputarray[i]);
+					}
+				}
+				output = filtered.join("\n");
+				//parse entry data into objects
+				for (i = 0; i < filtered.length; i++) {
+					var currentline = filtered[i].split("\t");
+					var entry = {
+						price:currentline[1],
+						time:currentline[2].substring(0, 19).replace("T", " "), //reformat timestamp
+						name:currentline[3]
+					};
+					entries.push(entry);
+				}
+			}
+			else if (zone == "x1r4r3m2cr1") {
+				typenames = type3;
+				var outputarray = output.split("\n");
+				var filtered = []; //use manual filter to preserve timestamp ordering
+				for (i = 0; i < outputarray.length; i++) {
+					if (
+						outputarray[i].includes("x1.") ||
+						outputarray[i].includes("r4.") ||
+						outputarray[i].includes("r3.") ||
+						outputarray[i].includes("m2.") ||
+						outputarray[i].includes("cr1.")
+						) {
+						filtered.push(outputarray[i]);
+					}
+				}
+				output = filtered.join("\n");
+				//parse entry data into objects
+				for (i = 0; i < filtered.length; i++) {
+					var currentline = filtered[i].split("\t");
+					var entry = {
+						price:currentline[1],
+						time:currentline[2].substring(0, 19).replace("T", " "), //reformat timestamp
+						name:currentline[3]
+					};
+					entries.push(entry);
+				}
+			}
+			else if (zone == "i3i2d2hi1") {
+				typenames = type4;
+				var outputarray = output.split("\n");
+				var filtered = []; //use manual filter to preserve timestamp ordering
+				for (i = 0; i < outputarray.length; i++) {
+					if (
+						outputarray[i].includes("i3.") ||
+						outputarray[i].includes("i2.") ||
+						outputarray[i].includes("d2.") ||
+						outputarray[i].includes("hi1.")
+						) {
+						filtered.push(outputarray[i]);
+					}
+				}
+				output = filtered.join("\n");
+				//parse entry data into objects
+				for (i = 0; i < filtered.length; i++) {
+					var currentline = filtered[i].split("\t");
+					var entry = {
+						price:currentline[1],
+						time:currentline[2].substring(0, 19).replace("T", " "), //reformat timestamp
+						name:currentline[3]
+					};
+					entries.push(entry);
+				}
+			}
+			else if (zone == "g3g2p2cg1f1") {
+				typenames = type5;
+				var outputarray = output.split("\n");
+				var filtered = []; //use manual filter to preserve timestamp ordering
+				for (i = 0; i < outputarray.length; i++) {
+					if (
+						outputarray[i].includes("g3.") ||
+						outputarray[i].includes("g2.") ||
+						outputarray[i].includes("p2.") ||
+						outputarray[i].includes("cg1.") ||
+						outputarray[i].includes("f1.")
+						) {
+						filtered.push(outputarray[i]);
+					}
+				}
+				output = filtered.join("\n");
+				//parse entry data into objects
+				for (i = 0; i < filtered.length; i++) {
+					var currentline = filtered[i].split("\t");
+					var entry = {
+						price:currentline[1],
+						time:currentline[2].substring(0, 19).replace("T", " "), //reformat timestamp
+						name:currentline[3]
+					};
+					entries.push(entry);
+				}
+			}
+
+			//check file was valid
+			if (output == "") {
+				output = "Unable to read file. Each data entry should be on a new line and tab-spaced in the following format:\n\n<Entry>   <Price>   <YYYY-MM-DD HH:MM:SS>   <InstanceType>   <OS>   <Location>".replace(/>/g, "&gt;").replace(/</g, "&lt;");
+			}
+
+			//replace newline character with line break for html preview
+			output = output.replace(/(?:\r\n|\r|\n)/g, '<br />');
+			//display raw data preview
+			document.getElementById('datapreview').innerHTML = output;
+
+			//--- start graph drawing ---
+			//---
+
+			//arrays for data timestamps/prices. add as many as the number of instance types to plot
+			var t1=[], t2=[], t3=[], t4=[], t5=[], t6=[], t7=[], t8=[], t9=[], t10=[], t11=[], t12=[], t13=[], t14=[], t15=[], t16=[], t17=[], t18=[], t19=[], t20=[];
+			var p1=[], p2=[], p3=[], p4=[], p5=[], p6=[], p7=[], p8=[], p9=[], p10=[], p11=[], p12=[], p13=[], p14=[], p15=[], p16=[], p17=[], p18=[], p19=[], p20=[];
+
+			var times = [t1,t2,t3,t4,t5,t7,t8,t9,t10,t11,t12,t13,t14,t15,t16,t17,t18,t19,t20];
+			var prices = [p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20];
+			var lagprices = [p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20];
+
+			//parse entry object data into individual arrays
+			for (i = 0; i < entries.length; i++) {
+				for (j = 0; j < typenames.length; j++) {
+					if (entries[i].name == typenames[j]) {
+						times[j].push(entries[i].time);
+						prices[j].push(entries[i].price);
+					}
+				}
+			}
+
+			//copy prices
+			lagprices = JSON.parse(JSON.stringify(prices));
+
+			//shift prices by 1 element left (time-lag graph compares current price with previous)
+			for (i = 0; i < lagprices.length; i++) {
+				lagprices[i].splice(0, 1);
+			}
+
+			var traces = [];
+
+			var nulltrace = { //unused
+			  	x: [],
+			  	y: [],
+ 			 	name: null,
+			 	mode: 'lines',
+			 	connectgaps: true
+			};
+
+			//create trace objects (data lines for graph) from data arrays
+			for (i = 0; i < typenames.length; i++) {
+				traces.push({
+					x: times[i],
+			  		y: prices[i],
+ 			 		name: typenames[i],
+ 			 	//	fill: 'tozeroy',
+ 			 	//	type: 'scatter',
+			 		mode: 'lines',
+			 		line: {
+			 			width: 1,
+			 			shape: 'hv' //this is the correct 'step' shape for contiunous time series
+			 		},
+			 		connectgaps: true
+				});
+			}
+
+			var data = traces;
+
+			//set graph title
+			var title = "Comparing " + document.getElementById("osselect").options[osselect.selectedIndex].text + " " + document.getElementById("typeselect").options[typeselect.selectedIndex].text + " Instances";
+
+			//set layout options
+			var layout = {
+  				title: title,
+  				yaxis: {
+    				title: 'Cost ($/hour)'
+  				},
+  				showlegend: true
+			};
+
+			Plotly.plot('graphdiv', data, layout);
+			//---
+			//--- end graph drawing ---
+
+			//--- begin histogram
+			var histdata = [];
+
+			for (i = 0; i < typenames.length; i++) {
+				histdata.push({
+			  		y: prices[i],
+ 			 		name: typenames[i],
+			 		type: 'histogram'
+				});
+			}
+
+			var histlayout = {
+				title: 'Histogram',
+				xaxis: {
+					title: 'Frequency'
+				},
+  				yaxis: {
+    				title: 'Cost ($/hour)'
+  				},
+				showlegend: true
+			};
+
+			Plotly.newPlot('histogramdiv', histdata, histlayout);
+			//--- end histogram
+			
+			//--- begin time lag plot
+			var lagtraces = [];
+
+			for (i = 0; i < typenames.length; i++) {
+				lagtraces.push({
+					x: lagprices[i],
+			  		y: prices[i],
+ 			 		name: typenames[i],
+ 			 		type: 'scatter',
+			 		mode: 'markers'
+				});
+			}
+
+			//set layout options
+			var laglayout = {
+				title: 'Time-Lag Plot',
+				xaxis: {
+					title: 'Spot Price (t-1)'
+				},
+  				yaxis: {
+    				title: 'Spot Price (t)'
+  				},
+  				showlegend: true
+			};
+
+			Plotly.plot('timelagdiv', lagtraces, laglayout);
+			//--- end time lag plot
+		};
+
+		//modify to read only first (x)mb... default = 1024 [1GB]
+		var mb = 1024;
+		reader.readAsText(that.files[0].slice(0, mb * 1024 * 1024));
+	}
+}
+
+</script>
+
+</body>
+
+</html>
